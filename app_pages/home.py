@@ -2,6 +2,7 @@
 
 import io
 import importlib
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -131,9 +132,9 @@ else:
     # ================= TAB 1: APPLICATION LOOKUP =================
     with main_tab_lookup:
         st.subheader("Application sizing & hardware lookup")
-
+        start = time.perf_counter()
         available_apps = extract_app_numbers(st.session_state.datasets)
-
+        print(f"Extract application numbers: {time.perf_counter() - start:.3f}s")
         col_search1, col_search2, col_btn = st.columns([3, 2, 1])
         with col_search1:
             entered_app = st.text_input(
@@ -167,7 +168,44 @@ else:
             selected_app_num = picked_app
 
         if selected_app_num:
-            app_info, servers_df, rollup = lookup_application(selected_app_num, st.session_state.datasets)
+            dataset_version = st.session_state.get("datasets_version", 0)
+            lookup_key = (dataset_version, selected_app_num)
+
+            cached = st.session_state.get("application_lookup_result")
+
+            needs_lookup = (
+                cached is None
+                or cached["key"] != lookup_key
+                or lookup_clicked
+            )
+
+            if needs_lookup:
+                start = time.perf_counter()
+
+                app_info, servers_df, rollup = lookup_application(
+                    selected_app_num,
+                    st.session_state.datasets
+                )
+
+                st.session_state["application_lookup_result"] = {
+                    "key": lookup_key,
+                    "app_info": app_info,
+                    "servers_df": servers_df,
+                    "rollup": rollup,
+                }
+
+                print(
+                    f"Application lookup: "
+                    f"{time.perf_counter() - start:.3f}s"
+                )
+            else:
+                print("Application lookup: reused saved result")
+
+            result = st.session_state["application_lookup_result"]
+            app_info = result["app_info"]
+            servers_df = result["servers_df"]
+            rollup = result["rollup"]
+            print(f"Application lookup: {time.perf_counter() - start:.3f}s")
 
             app_name = app_info.get("Name", "Name Not Specified in Catalog")
             env = app_info.get("Environment", "Unknown")
