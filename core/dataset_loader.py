@@ -57,7 +57,23 @@ def load_dataset_from_source(source, expected_schema=None, slot_key=None):
                 df = pd.read_excel(excel_file, sheet_name=pref_sheet)
                 is_excel = True
             else:
-                df = pd.read_csv(file_path)
+                # CSV files may come from Windows/Excel with different encodings
+                encodings = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
+        
+                last_error = None
+        
+                for encoding in encodings:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding)
+                        break
+                    except UnicodeDecodeError as e:
+                        last_error = e
+                else:
+                    raise ValueError(
+                        f"Unable to decode CSV file '{file_name}'. "
+                        f"Tried encodings: {', '.join(encodings)}"
+                    ) from last_error
+        
                 sheet_names = ["default"]
                 pref_sheet = "default"
                 is_excel = False
